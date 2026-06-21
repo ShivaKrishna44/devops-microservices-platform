@@ -56,6 +56,16 @@ pipeline {
                 checkout scm
             }
         }
+
+    stage('Debug Workspace') {
+          steps {
+             sh '''
+             pwd
+             ls -R
+            '''
+          }
+    }
+}
         
         stage('Build & Test') {
             parallel {
@@ -170,8 +180,8 @@ pipeline {
     post {
         always {
             echo '🏁 Pipeline execution completed.'
-            cleanWs()
-        }
+            deleteDir()
+                    }
         success {
             script {
                 echo "✅ SUCCESS: ${env.SERVICE_NAME} deployed with tag: ${env.IMAGE_TAG}"
