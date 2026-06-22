@@ -8,7 +8,7 @@
 # EBS CSI Driver IAM Role Setup
 # ==========================================
 
-# Step 1: Define who can assume the EBS CSI role (trust policy)
+#Step 1: Define who can assume the EBS CSI role (trust policy)
 data "aws_iam_policy_document" "ebs_csi_assume_role" {
   statement {
     # Action: Allow assuming role with web identity (OIDC)
@@ -39,7 +39,7 @@ data "aws_iam_policy_document" "ebs_csi_assume_role" {
   }
 }
 
-# Step 2: Create the actual IAM role for EBS CSI driver
+#Step 2: Create the actual IAM role for EBS CSI driver
 resource "aws_iam_role" "ebs_csi" {
   name = "${var.project_name}-${var.environment}-ebs-csi-role"
   # Use the trust policy we defined above
