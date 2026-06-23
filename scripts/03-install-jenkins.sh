@@ -16,17 +16,19 @@ echo "========================================="
 ./helm.exe repo update
 
 # Install/Upgrade Jenkins
+# Removed --wait --timeout to avoid deadline exceeded on slow node scheduling
+# Monitor pod startup manually with: kubectl get pods -n jenkins -w
 ./helm.exe upgrade --install jenkins \
   jenkins/jenkins \
   -n jenkins \
-  --wait --timeout 5m \
   -f kubernetes/jenkins/jenkins-values.yaml
 
 # Wait for Jenkins to be ready
+# NOTE: Jenkins Helm chart uses a StatefulSet, not a Deployment
 echo "========================================="
 echo "Waiting for Jenkins to be ready..."
 echo "========================================="
-kubectl rollout status deployment/jenkins -n jenkins --timeout=120s
+./kubectl.exe rollout status statefulset/jenkins -n jenkins --timeout=300s
 
 # Apply Jenkins Ingress
 echo "========================================="
