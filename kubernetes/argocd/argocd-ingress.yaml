@@ -12,7 +12,7 @@ metadata:
     alb.ingress.kubernetes.io/healthcheck-path: /healthz
     alb.ingress.kubernetes.io/backend-protocol: HTTPS
     alb.ingress.kubernetes.io/backend-protocol-version: HTTP1
-    alb.ingress.kubernetes.io/certificate-arn: "REPLACE_WITH_ACM_CERT_ARN"
+    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-east-1:589389425618:certificate/7c22798a-e5f0-49dd-9533-4cc0f5659027"
 spec:
   ingressClassName: alb
   rules:
