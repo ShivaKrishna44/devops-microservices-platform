@@ -1,6 +1,5 @@
 #!/bin/bash
-
-set -e
+set -euxo pipefail
 
 echo "========================================="
 echo "Jenkins Agent Setup"
@@ -14,7 +13,9 @@ echo "========================================="
 echo "1. Installing Java 21"
 echo "========================================="
 
-sudo dnf install -y java-21-amazon-corretto
+# FIX: java-21-amazon-corretto is not available on RHEL 9 via default repos
+# Use java-21-openjdk which is in the standard RHEL/EPEL repos
+sudo dnf install -y java-21-openjdk java-21-openjdk-devel
 
 java -version
 
@@ -32,10 +33,12 @@ echo "========================================="
 echo "3. Installing kubectl"
 echo "========================================="
 
-curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+# FIX: Added -f flag so HTTP errors fail the script
+# FIX: Added curl for the stable version lookup too
+KUBECTL_VERSION=$(curl -fsSL https://dl.k8s.io/release/stable.txt)
+curl -fLO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
 
 chmod +x kubectl
-
 sudo mv kubectl /usr/local/bin/
 
 kubectl version --client
@@ -45,13 +48,14 @@ echo "========================================="
 echo "4. Installing Terraform"
 echo "========================================="
 
-sudo yum install -y yum-utils
+sudo dnf install -y yum-utils
 
-sudo yum-config-manager 
---add-repo 
-https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
+# FIX: Fixed broken multi-line commands — added proper \ line continuations
+sudo yum-config-manager \
+  --add-repo \
+  https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
 
-sudo yum install -y terraform
+sudo dnf install -y terraform
 
 terraform version
 
@@ -60,20 +64,22 @@ echo "========================================="
 echo "5. Installing Docker"
 echo "========================================="
 
-sudo dnf config-manager 
---add-repo 
-https://download.docker.com/linux/rhel/docker-ce.repo
+# FIX: Fixed broken multi-line commands
+sudo dnf config-manager \
+  --add-repo \
+  https://download.docker.com/linux/rhel/docker-ce.repo
 
-sudo dnf install -y 
-docker-ce 
-docker-ce-cli 
-containerd.io
+sudo dnf install -y \
+  docker-ce \
+  docker-ce-cli \
+  containerd.io
 
 sudo systemctl enable docker
-
 sudo systemctl start docker
 
+# FIX: Added jenkins user to docker group if it exists
 sudo usermod -aG docker ec2-user
+id jenkins &>/dev/null && sudo usermod -aG docker jenkins || true
 
 docker --version
 
@@ -82,9 +88,10 @@ echo "========================================="
 echo "6. Configure EKS Access"
 echo "========================================="
 
-aws eks update-kubeconfig 
---region ${REGISTRY_REGION} 
---name ${EKS_CLUSTER}
+# FIX: Fixed broken multi-line command
+aws eks update-kubeconfig \
+  --region ${REGISTRY_REGION} \
+  --name ${EKS_CLUSTER}
 
 kubectl get nodes
 
@@ -94,7 +101,6 @@ echo "7. Create Jenkins Directories"
 echo "========================================="
 
 mkdir -p ~/jenkins
-
 chmod 755 ~/jenkins
 
 echo
@@ -109,39 +115,20 @@ echo "========================================="
 echo "9. Validate ECR"
 echo "========================================="
 
-aws ecr describe-repositories
+aws ecr describe-repositories --region ${REGISTRY_REGION}
 
 echo
 echo "========================================="
 echo "10. Validation Summary"
 echo "========================================="
 
-echo "JAVA:"
-java -version
-
-echo
-echo "AWS:"
-aws --version
-
-echo
-echo "GIT:"
-git --version
-
-echo
-echo "KUBECTL:"
-kubectl version --client
-
-echo
-echo "TERRAFORM:"
-terraform version
-
-echo
-echo "DOCKER:"
-docker --version
-
-echo
-echo "EKS:"
-kubectl get nodes
+echo "JAVA:";      java -version
+echo "AWS:";       aws --version
+echo "GIT:";       git --version
+echo "KUBECTL:";   kubectl version --client
+echo "TERRAFORM:"; terraform version
+echo "DOCKER:";    docker --version
+echo "EKS:";       kubectl get nodes
 
 echo
 echo "========================================="
