@@ -130,20 +130,17 @@ pipeline {
                             echo "🔨 Building Docker image..."
                             docker build -t ${SERVICE_NAME}:${IMAGE_TAG} .
                             docker tag ${SERVICE_NAME}:${IMAGE_TAG} ${FULL_IMAGE_NAME}
-                            docker tag ${SERVICE_NAME}:${IMAGE_TAG} ${LATEST_IMAGE_NAME}
                         '''
 
                         sh '''
                             echo "📤 Pushing image to ECR..."
                             docker push ${FULL_IMAGE_NAME}
-                            docker push ${LATEST_IMAGE_NAME}
                         '''
 
                         sh '''
                             echo "🧹 Cleaning up local images..."
                             docker rmi ${SERVICE_NAME}:${IMAGE_TAG} || true
                             docker rmi ${FULL_IMAGE_NAME} || true
-                            docker rmi ${LATEST_IMAGE_NAME} || true
                         '''
                     }
                 }
