@@ -433,3 +433,82 @@ aws ecr get-login-password --region us-east-1 | \
 - [ ] Install monitoring: `bash scripts/05-install-monitoring.sh`
 - [ ] Apply app ingress: `./kubectl.exe apply -f kubernetes/ingress/app-ingress.yaml`
 - [ ] Set up ArgoCD applications for GitOps deployment
+
+---
+
+## Operations Dashboard — Status & Common Tasks
+
+### Where to See Status
+
+| What | Where | URL / Command |
+|---|---|---|
+| Pipeline builds | Jenkins UI | `https://jenkins.vosukula.online/job/devops-microservices-pipeline/` |
+| GitOps deployments | ArgoCD UI | `https://argocd.vosukula.online/applications` |
+| Cluster metrics | Grafana UI | `https://grafana.vosukula.online` |
+| Code quality | SonarQube UI | `https://sonar.vosukula.online` |
+| All pods | CLI | `./kubectl.exe get pods -A` |
+| All ingresses/ALBs | CLI | `./kubectl.exe get ingress -A` |
+| Node health | CLI | `./kubectl.exe get nodes` |
+| ECR images | AWS Console | ECR → us-east-1 → Repositories |
+
+### How to Build & Deploy a Service
+
+1. Go to Jenkins: `https://jenkins.vosukula.online/job/devops-microservices-pipeline/`
+2. Click **"Build with Parameters"**
+3. Select: `SERVICE_NAME` (order/payment/user), `IMAGE_TAG` (e.g. `2.0`)
+4. Click **Build**
+5. Watch progress in Console Output
+6. ArgoCD auto-syncs the new image if using GitOps mode
+
+### How to Check ArgoCD Sync
+
+1. Go to: `https://argocd.vosukula.online/applications`
+2. Each app shows: **Healthy** (green) or **Degraded** (red)
+3. Click an app to see pods, services, events
+4. Click **SYNC** to manually force a resync
+
+### How to View Grafana Dashboards
+
+1. Go to: `https://grafana.vosukula.online`
+2. Login: `admin` / your password
+3. Left sidebar → Dashboards → Browse
+4. Pre-built: `Kubernetes / Compute Resources / Cluster`
+5. Pod-level: `Kubernetes / Compute Resources / Pod`
+
+### How to Check SonarQube
+
+1. Go to: `https://sonar.vosukula.online`
+2. Login: `admin` / `admin` (change on first login)
+3. Projects tab → click a service → see bugs, vulnerabilities, code smells
+
+### How to Check Canary/Blue-Green Rollouts
+
+```bash
+# View rollout status (after enabling rollout.enabled=true in values)
+kubectl argo rollouts get rollout order-service -n order-service --watch
+
+# Promote past a pause step
+kubectl argo rollouts promote order-service -n order-service
+
+# Abort and rollback
+kubectl argo rollouts abort order-service -n order-service
+```
+
+### Quick CLI — Show Only Problem Pods
+
+```bash
+./kubectl.exe get pods -A | grep -v "Running\|Completed"
+```
+
+### Per-Namespace Status
+
+```bash
+./kubectl.exe get all -n order-service
+./kubectl.exe get all -n payment-service
+./kubectl.exe get all -n user-service
+./kubectl.exe get all -n jenkins
+./kubectl.exe get all -n argocd
+./kubectl.exe get all -n monitoring
+./kubectl.exe get all -n sonarqube
+./kubectl.exe get all -n argo-rollouts
+```
