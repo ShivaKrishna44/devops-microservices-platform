@@ -1,5 +1,9 @@
-# SonarQube Helm Values
+# SonarQube Community Build Helm Values
 # Chart: sonarqube/sonarqube
+
+# Required: Use Community edition (free)
+community:
+  enabled: true
 
 monitoringPasscode: "define_it"
 
@@ -15,6 +19,3 @@ resources:
   limits:
     cpu: 2000m
     memory: 4Gi
-
-# Uses embedded H2 database (suitable for dev/demo)
-# For production, configure external PostgreSQL
