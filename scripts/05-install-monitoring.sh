@@ -12,8 +12,8 @@ source ./scripts/config.sh
 # Create the Grafana admin secret (idempotent — skips if it already exists)
 if ! ./kubectl.exe get secret grafana-admin-secret -n monitoring &>/dev/null; then
   echo "Creating grafana-admin-secret..."
-  # Replace the password value below before running, or inject via CI/CD env var
   GRAFANA_PASSWORD="${GRAFANA_ADMIN_PASSWORD:-changeme}"
+  echo "⚠️  Using default password 'changeme' — set GRAFANA_ADMIN_PASSWORD env var for production"
   ./kubectl.exe create secret generic grafana-admin-secret \
     --from-literal=admin-user=admin \
     --from-literal=admin-password="${GRAFANA_PASSWORD}" \
@@ -36,3 +36,8 @@ echo "Waiting for Grafana deployment to be ready..."
 
 ./kubectl.exe get pods -n monitoring
 echo " ✔ Prometheus ✔ Grafana ✔ Alertmanager "
+
+# Apply Grafana ingress for external access
+echo "Applying Grafana ingress..."
+./kubectl.exe apply -f kubernetes/ingress/grafana-ingress.yaml
+./kubectl.exe get ingress -n monitoring

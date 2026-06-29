@@ -549,6 +549,15 @@ aws ecr get-login-password --region us-east-1 | \
 3. Click an app to see pods, services, events
 4. Click **SYNC** to manually force a resync
 
+before SYNC - ./kubectl.exe apply -f kubernetes/argocd/apps/
+
+$ ./kubectl.exe get applications -n argocd
+NAME              SYNC STATUS   HEALTH STATUS
+order-service     OutOfSync     Progressing
+payment-service   OutOfSync     Progressing
+user-service      OutOfSync     Progressing
+
+
 ### How to View Grafana Dashboards
 
 1. Go to: `https://grafana.vosukula.online`
@@ -556,6 +565,43 @@ aws ecr get-login-password --region us-east-1 | \
 3. Left sidebar → Dashboards → Browse
 4. Pre-built: `Kubernetes / Compute Resources / Cluster`
 5. Pod-level: `Kubernetes / Compute Resources / Pod`
+
+### Import Pre-built Dashboards (recommended)
+
+1. Dashboards → **Import** → enter Dashboard ID → Load → select `Prometheus` → Import
+
+| Dashboard ID | Name | What It Shows |
+|---|---|---|
+| `15760` | Kubernetes Cluster Monitoring | Nodes, pods, CPU, memory overview |
+| `13770` | Kubernetes Pod Metrics | Per-pod CPU, memory, network |
+| `12006` | Kubernetes Deployment Metrics | Deployment replicas, rollout status |
+| `1860` | Node Exporter Full | Detailed node-level metrics |
+
+### Set Up Alerts in Grafana
+
+1. Left sidebar → **Alerting** → **Alert rules** → **+ New alert rule**
+2. Example alert queries:
+
+| Alert | PromQL Query |
+|---|---|
+| Pod restarts > 3 in 5 min | `increase(kube_pod_container_status_restarts_total[5m]) > 3` |
+| Node CPU > 80% | `100 - (avg by(instance)(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80` |
+| Pod not ready | `kube_pod_status_ready{condition="false"} == 1` |
+| Disk usage > 85% | `(node_filesystem_size_bytes - node_filesystem_avail_bytes) / node_filesystem_size_bytes * 100 > 85` |
+
+3. Set evaluation: every 1 min, fire after 5 min continuous breach
+4. Add **Contact point**: Alerting → Contact points → + Add → Slack/Email/Webhook
+5. Save
+
+### Configure Slack Notifications (optional)
+
+1. Create Slack incoming webhook: [Slack API](https://api.slack.com/messaging/webhooks)
+2. Grafana → Alerting → Contact points → + Add contact point
+3. Name: `slack-alerts`, Type: Slack, Webhook URL: paste
+4. Test → Save
+5. Assign contact point to your alert rules
+
+
 
 ### How to Check SonarQube
 

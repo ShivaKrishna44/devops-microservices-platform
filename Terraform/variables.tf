@@ -75,9 +75,8 @@ variable "node_group_instance_type" {
 variable "desired_size" {
   description = "Desired number of worker nodes in EKS cluster - target capacity"
   type        = number
-  default     = 2
-  # Start with 2 nodes for high availability
-  # Auto-scaling will adjust between min_size and max_size
+  default     = 3
+  # 3 nodes needed to run: Jenkins + monitoring + ArgoCD + SonarQube + 3 microservices
 }
 
 # Step 8: Define minimum worker nodes
@@ -92,7 +91,7 @@ variable "min_size" {
 variable "max_size" {
   description = "Maximum number of worker nodes - highest capacity during scale-up"
   type        = number
-  default     = 3
+  default     = 4
   # Set based on expected peak load and cost constraints
 }
 
