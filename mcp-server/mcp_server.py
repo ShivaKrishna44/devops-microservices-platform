@@ -595,6 +595,86 @@ def check_route53_records(zone_name: str = "vosukula.online") -> str:
 
 
 # ==========================================
+# RAG — Search Project Documentation
+# ==========================================
+
+@mcp.tool
+def search_runbook(query: str) -> str:
+    """Search project documentation (deployment guides, troubleshooting, runbooks) using AI-powered semantic search.
+    
+    Use this when you need to answer:
+      - "How did we fix X issue before?"
+      - "What's the process for deploying Y?"
+      - "What were the steps to set up Z?"
+    
+    Examples:
+      - search_runbook("how to fix Jenkins Init:0/2")
+      - search_runbook("ECR push permission denied")
+      - search_runbook("ArgoCD sync setup")
+      - search_runbook("terraform state lock stuck")
+    
+    Requires: Run 'python rag/ingest.py' first to index documents.
+    """
+    try:
+        import sys
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "rag"))
+        from query import search_docs
+        return search_docs(query)
+    except ImportError as e:
+        return f"❌ RAG dependencies not installed. Run: pip install -r rag/requirements.txt\nError: {e}"
+    except Exception as e:
+        return f"❌ RAG query failed: {str(e)}\nHave you run 'python rag/ingest.py' to index docs?"
+
+
+@mcp.tool
+def search_troubleshooting(error_message: str) -> str:
+    """Search specifically for troubleshooting solutions based on an error message.
+    
+    Optimized for finding fixes to errors you've seen before.
+    
+    Examples:
+      - search_troubleshooting("MountVolume.SetUp failed for volume jenkins-secrets")
+      - search_troubleshooting("ImagePullBackOff")
+      - search_troubleshooting("context deadline exceeded")
+      - search_troubleshooting("CertificateNotFound")
+    """
+    try:
+        import sys
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "rag"))
+        from query import search_docs
+        # Prefix with troubleshooting context for better retrieval
+        enriched_query = f"error fix solution: {error_message}"
+        return search_docs(enriched_query, n_results=3)
+    except ImportError as e:
+        return f"❌ RAG dependencies not installed. Run: pip install -r rag/requirements.txt\nError: {e}"
+    except Exception as e:
+        return f"❌ RAG query failed: {str(e)}"
+
+
+@mcp.tool
+def search_deployment_steps(component: str) -> str:
+    """Search for deployment/setup steps for a specific component.
+    
+    Examples:
+      - search_deployment_steps("Jenkins")
+      - search_deployment_steps("ArgoCD")
+      - search_deployment_steps("monitoring Grafana")
+      - search_deployment_steps("SonarQube")
+      - search_deployment_steps("Terraform EKS")
+    """
+    try:
+        import sys
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "rag"))
+        from query import search_docs
+        enriched_query = f"install setup deploy steps: {component}"
+        return search_docs(enriched_query, n_results=5)
+    except ImportError as e:
+        return f"❌ RAG dependencies not installed. Run: pip install -r rag/requirements.txt\nError: {e}"
+    except Exception as e:
+        return f"❌ RAG query failed: {str(e)}"
+
+
+# ==========================================
 # Run Server
 # ==========================================
 
@@ -605,5 +685,6 @@ if __name__ == "__main__":
     print(f"  AWS Region: {AWS_REGION}")
     print(f"  GitHub Owner: {GITHUB_OWNER}")
     print(f"  GitHub Token: {'configured' if GITHUB_TOKEN else 'NOT SET (GitHub tools will fail)'}")
-    print("\nTools: kubectl, prometheus, github, aws")
+    print("\nTools: kubectl, prometheus, github, aws, rag")
+    print("RAG: search_runbook, search_troubleshooting, search_deployment_steps")
     mcp.run()

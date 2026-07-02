@@ -1,0 +1,290 @@
+---
+# ============================================
+# Playbook: Configure Jenkins Agent (EC2)
+# ============================================
+# Replaces: scripts/setup-jenkins-agent.sh
+# Benefits: Idempotent, repeatable, scalable to multiple agents
+#
+# Usage:
+#   ansible-playbook playbooks/setup-jenkins-agent.yml
+#   ansible-playbook playbooks/setup-jenkins-agent.yml --limit jenkins-agent
+#
+# ============================================
+
+- name: Configure Jenkins Agent EC2 Instance
+  hosts: jenkins_agents
+  become: yes
+
+  tasks:
+    # ==========================================
+    # 1. Install Java 21
+    # ==========================================
+    - name: Install Java 21 (OpenJDK)
+      dnf:
+        name:
+          - "{{ java_package }}"
+          - "{{ java_devel_package }}"
+        state: present
+
+    - name: Verify Java installation
+      command: java -version
+      register: java_version
+      changed_when: false
+
+    - name: Display Java version
+      debug:
+        msg: "{{ java_version.stderr_lines[0] }}"
+
+    # ==========================================
+    # 2. Install Git
+    # ==========================================
+    - name: Install Git
+      dnf:
+        name: git
+        state: present
+
+    # ==========================================
+    # 3. Install kubectl
+    # ==========================================
+    - name: Get latest kubectl version
+      uri:
+        url: https://dl.k8s.io/release/stable.txt
+        return_content: yes
+      register: kubectl_version
+
+    - name: Download kubectl
+      get_url:
+        url: "https://dl.k8s.io/release/{{ kubectl_version.content | trim }}/bin/linux/amd64/kubectl"
+        dest: /usr/local/bin/kubectl
+        mode: '0755'
+
+    - name: Verify kubectl
+      command: kubectl version --client --short
+      register: kubectl_check
+      changed_when: false
+      ignore_errors: yes
+
+    # ==========================================
+    # 4. Install Terraform
+    # ==========================================
+    - name: Add HashiCorp repository
+      yum_repository:
+        name: hashicorp
+        description: HashiCorp Official Repository
+        baseurl: https://rpm.releases.hashicorp.com/RHEL/$releasever/$basearch/stable
+        gpgcheck: yes
+        gpgkey: https://rpm.releases.hashicorp.com/gpg
+        enabled: yes
+
+    - name: Install Terraform
+      dnf:
+        name: terraform
+        state: present
+
+    # ==========================================
+    # 5. Install Docker
+    # ==========================================
+    - name: Add Docker repository
+      yum_repository:
+        name: docker-ce
+        description: Docker CE Stable
+        baseurl: https://download.docker.com/linux/rhel/$releasever/$basearch/stable
+        gpgcheck: yes
+        gpgkey: https://download.docker.com/linux/rhel/gpg
+        enabled: yes
+
+    - name: Install Docker packages
+      dnf:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+        state: present
+
+    - name: Start and enable Docker service
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add ec2-user to docker group
+      user:
+        name: ec2-user
+        groups: docker
+        append: yes
+
+    # ==========================================
+    # 6. Install Helm
+    # ==========================================
+    - name: Download Helm archive
+      get_url:
+        url: https://get.helm.sh/helm-v3.17.0-linux-amd64.tar.gz
+        dest: /tmp/helm.tar.gz
+
+    - name: Extract Helm binary
+      unarchive:
+        src: /tmp/helm.tar.gz
+        dest: /tmp/
+        remote_src: yes
+
+    - name: Install Helm to /usr/local/bin
+      copy:
+        src: /tmp/linux-amd64/helm
+        dest: /usr/local/bin/helm
+        mode: '0755'
+        remote_src: yes
+
+    - name: Clean up Helm temp files
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/helm.tar.gz
+        - /tmp/linux-amd64
+
+    # ==========================================
+    # 7. Install SonarQube Scanner
+    # ==========================================
+    - name: Download SonarQube Scanner
+      get_url:
+        url: "{{ sonar_scanner_url }}"
+        dest: /tmp/sonar-scanner.zip
+
+    - name: Install unzip
+      dnf:
+        name: unzip
+        state: present
+
+    - name: Extract SonarQube Scanner
+      unarchive:
+        src: /tmp/sonar-scanner.zip
+        dest: /opt/
+        remote_src: yes
+        creates: "/opt/sonar-scanner-{{ sonar_scanner_version }}-linux"
+
+    - name: Create sonar-scanner symlink
+      file:
+        src: "/opt/sonar-scanner-{{ sonar_scanner_version }}-linux/bin/sonar-scanner"
+        dest: /usr/local/bin/sonar-scanner
+        state: link
+
+    - name: Clean up sonar temp file
+      file:
+        path: /tmp/sonar-scanner.zip
+        state: absent
+
+    # ==========================================
+    # 8. Configure EKS Access
+    # ==========================================
+    - name: Configure kubeconfig for EKS
+      command: >
+        aws eks update-kubeconfig
+        --region {{ aws_region }}
+        --name {{ eks_cluster_name }}
+      become_user: ec2-user
+      changed_when: true
+
+    - name: Verify EKS connectivity
+      command: kubectl get nodes
+      become_user: ec2-user
+      register: eks_nodes
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Display EKS nodes
+      debug:
+        msg: "{{ eks_nodes.stdout_lines }}"
+      when: eks_nodes.rc == 0
+
+    # ==========================================
+    # 9. Create Jenkins Agent Directory
+    # ==========================================
+    - name: Create Jenkins agent work directory
+      file:
+        path: "{{ jenkins_agent_workdir }}"
+        state: directory
+        owner: ec2-user
+        group: ec2-user
+        mode: '0755'
+
+    # ==========================================
+    # 10. Download Jenkins agent.jar
+    # ==========================================
+    - name: Download Jenkins agent.jar
+      get_url:
+        url: "{{ jenkins_url }}/jnlpJars/agent.jar"
+        dest: /home/ec2-user/agent.jar
+        owner: ec2-user
+        group: ec2-user
+        mode: '0644'
+        validate_certs: no
+
+    # ==========================================
+    # 11. Create Jenkins Agent systemd service
+    # ==========================================
+    - name: Create Jenkins agent service file
+      template:
+        src: ../templates/jenkins-agent.service.j2
+        dest: /etc/systemd/system/jenkins-agent.service
+        mode: '0644'
+      notify: restart jenkins-agent
+
+    - name: Enable Jenkins agent service
+      systemd:
+        name: jenkins-agent
+        enabled: yes
+        daemon_reload: yes
+
+    # ==========================================
+    # 12. Validate Installation
+    # ==========================================
+    - name: Validate all tools installed
+      command: "{{ item }}"
+      loop:
+        - java -version
+        - git --version
+        - kubectl version --client
+        - terraform version
+        - docker --version
+        - helm version --short
+        - sonar-scanner --version
+        - aws --version
+      register: validation
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Display validation summary
+      debug:
+        msg: "✅ All tools installed successfully on {{ inventory_hostname }}"
+
+    # ==========================================
+    # 13. Disk Cleanup
+    # ==========================================
+    - name: Prune unused Docker resources
+      command: docker system prune -af
+      changed_when: true
+      ignore_errors: yes
+
+    - name: Clean dnf cache
+      command: dnf clean all
+      changed_when: true
+
+    - name: Check available disk space
+      command: df -h /home
+      register: disk_space
+      changed_when: false
+
+    - name: Display disk space
+      debug:
+        msg: "{{ disk_space.stdout_lines }}"
+
+  # ==========================================
+  # Handlers
+  # ==========================================
+  handlers:
+    - name: restart jenkins-agent
+      systemd:
+        name: jenkins-agent
+        state: restarted
+        daemon_reload: yes
+      ignore_errors: yes

@@ -1,0 +1,21 @@
+[Unit]
+Description=Jenkins Agent ({{ jenkins_agent_name }})
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+User=ec2-user
+Group=ec2-user
+WorkingDirectory={{ jenkins_agent_workdir }}
+ExecStart=/usr/bin/java -jar /home/ec2-user/agent.jar \
+  -url {{ jenkins_url }}/ \
+  -secret {{ jenkins_agent_secret | default('REPLACE_WITH_SECRET') }} \
+  -name "{{ jenkins_agent_name }}" \
+  -webSocket \
+  -workDir "{{ jenkins_agent_workdir }}"
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
