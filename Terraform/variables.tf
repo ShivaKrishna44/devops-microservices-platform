@@ -13,8 +13,8 @@
 variable "project_name" {
   description = "Name of the project - used as prefix for all resource names"
   type        = string
-  default     = "expense"
-  # This will be used like: expense-dev-vpc, expense-prod-cluster, etc.
+  default     = "platform"
+  # This will be used like: platform-dev-vpc, platform-prod-cluster, etc.
 }
 
 # Step 2: Define the environment (dev/staging/prod)
@@ -46,8 +46,8 @@ variable "common_tags" {
 variable "cluster_name" {
   description = "Name of the EKS cluster - should be unique in your AWS account"
   type        = string
-  default     = "expense-dev"
-  # Examples: expense-dev, expense-prod, myapp-staging
+  default     = "platform-dev"
+  # Distinct from devops-microservices-crewAi's "expense-dev" — separate cluster.
 }
 
 # Step 5: Define Kubernetes version
@@ -104,9 +104,9 @@ variable "max_size" {
 variable "vpc_cidr" {
   description = "CIDR block for VPC - defines the IP address range for entire network"
   type        = string
-  default     = "10.0.0.0/16"
-  # 10.0.0.0/16 gives us 65,536 IP addresses (10.0.0.0 to 10.0.255.255)
-  # Common alternatives: 172.16.0.0/16, 192.168.0.0/16
+  default     = "10.1.0.0/16"
+  # 10.1.0.0/16 — distinct from devops-microservices-crewAi's 10.0.0.0/16 so
+  # the two clusters' VPCs don't overlap.
 }
 
 # Step 11: Define public subnet IP ranges
@@ -114,8 +114,8 @@ variable "public_subnet_cidrs" {
   description = "CIDR blocks for public subnets - where load balancers and NAT gateways go"
   type        = list(string)
   default = [
-    "10.0.1.0/24", # First public subnet: 10.0.1.0 to 10.0.1.255 (256 IPs)
-    "10.0.2.0/24"  # Second public subnet: 10.0.2.0 to 10.0.2.255 (256 IPs)
+    "10.1.1.0/24", # First public subnet
+    "10.1.2.0/24"  # Second public subnet
   ]
   # Public subnets have internet gateway access for inbound/outbound internet traffic
 }
@@ -125,8 +125,8 @@ variable "private_subnet_cidrs" {
   description = "CIDR blocks for private subnets - where application pods and worker nodes go"
   type        = list(string)
   default = [
-    "10.0.11.0/24", # First private subnet: 10.0.11.0 to 10.0.11.255 (256 IPs)
-    "10.0.12.0/24"  # Second private subnet: 10.0.12.0 to 10.0.12.255 (256 IPs)
+    "10.1.11.0/24", # First private subnet
+    "10.1.12.0/24"  # Second private subnet
   ]
   # Private subnets use NAT gateway for outbound internet (more secure)
 }
@@ -136,8 +136,8 @@ variable "database_subnet_cidrs" {
   description = "CIDR blocks for database subnets - isolated network for RDS databases"
   type        = list(string)
   default = [
-    "10.0.21.0/24", # First DB subnet: 10.0.21.0 to 10.0.21.255 (256 IPs)
-    "10.0.22.0/24"  # Second DB subnet: 10.0.22.0 to 10.0.22.255 (256 IPs)
+    "10.1.21.0/24", # First DB subnet
+    "10.1.22.0/24"  # Second DB subnet
   ]
   # Database subnets are most isolated - no internet access, only internal communication
 }
