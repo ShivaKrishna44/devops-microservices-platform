@@ -64,8 +64,7 @@ terraform apply -var-file=tfvars/dev/dev.tfvars
 ```
 
 This creates the VPC, the EKS cluster (`expense-dev` by default), a managed
-node group, ECR repos, and IAM roles (node group + IRSA for EBS CSI / ALB
-controller — see `iam-irsa.tf`).
+node group, ECR repos, and IAM roles (node group + IRSA for EBS CSI / ALB controller — see `iam-irsa.tf`).
 
 ```bash
 terraform output
