@@ -1,0 +1,30 @@
+{
+  "id": "FEAT-006",
+  "type": "docs",
+  "description": "Docs and local verification: VERSIONS.md top table 'Values to confirm before first run', scripts/verify-local.sh additions (terraform-shared validate, helm lint/template if helm exists, sample-app tests, YAML parse, entrypoint bash -n), README.md (ASCII end-to-end diagram, honest status table, bill table), docs/end-to-end.md, RUNBOOK.md (steps, settings table, troubleshooting, bill table), docs/safety-model.md (add-ons, CI trust, extra known limits), and a final naming consistency pass. Covers plan.md items 17 to 19. Runs last: it describes what FEAT-001 to FEAT-005 actually produced, so read their findings and verification sections first.",
+  "status": "pending",
+  "steps": [
+    "Read FEAT-001 to FEAT-005 findings and the '## FEAT-00N' sections of c:\\Devops\\Repository\\devops-microservices-platform\\.agents\\tasks\\phase3-idp\\verification.md to learn which placeholders remain and which checks are UNVERIFIED.",
+    "Item 17: edit VERSIONS.md (new table at the very top: value, status, where used, source URL, still a placeholder in the repo yes or no, built from plan.md section 2 and the real file contents; add pinned rows), edit scripts\\verify-local.sh (terraform-shared fmt/init -backend=false/validate; helm lint and template when helm exists else skip; sample-app backend pytest in its own process; Python YAML parse of gitops and the workflow; bash -n on sample-app/frontend/docker-entrypoint.d/*.sh); keep the header guard (no terraform plan/apply/destroy, no aws, no kubectl).",
+    "Item 18: edit README.md (ASCII diagram developer push -> GitHub Actions -> ECR -> Git tag update -> portal Refresh/Plan/Sync -> ArgoCD -> EKS -> portal pods/containers/logs/ArgoCD; honest status table with every new row 'not run'; 'what this adds to the bill' table labelled as estimates; scope, layout and phases updated; safety bullets for logs and CI trust added), create docs\\end-to-end.md in chunks (empty account to running sample app; terraform-shared first; provision.sh; push repo and set AWS_DEPLOY_ROLE_ARN; create ArgoCD apps; catalog entries and RBAC lines; first deploy through the gated portal; enable the sample Ingress with cost note; teardown order).",
+    "Item 19: edit RUNBOOK.md (order table, shared stack section, OIDC choice, LBC policy download and compare command, INSTALL_ADDONS, add-ons checks, sample app steps, optional ALB, teardown, bill table, settings table, troubleshooting rows) and docs\\safety-model.md (add-ons, CI trust, new known limits; remove nothing). docs\\diagnose-checks.md is NOT changed. Final naming consistency pass across all files.",
+    "Append a '## FEAT-006' section to c:\\Devops\\Repository\\devops-microservices-platform\\.agents\\tasks\\phase3-idp\\verification.md, and make sure the file ends with a consolidated command block of every UNVERIFIED check."
+  ],
+  "acceptance_criteria": [
+    "VERSIONS.md starts (after the title and intro) with a table named 'Values to confirm before first run' listing every value that is still a placeholder or only 'seen' once, each with its source URL",
+    "verify-local.sh syntax passes with bash -n, still contains no terraform plan/apply/destroy, no aws and no kubectl call, and runs the new checks",
+    "README.md and RUNBOOK.md each contain a 'what this adds to the bill' table labelled as an estimate to check against AWS pricing; the README has the ASCII end-to-end diagram and a status table whose new rows all say 'not run'",
+    "docs/end-to-end.md covers terraform-shared first, then provision.sh, then pushing the repo and setting AWS_DEPLOY_ROLE_ARN, creating the ArgoCD apps, catalog entries, first deploy through the portal, enabling the sample ingress with a cost note, and teardown order",
+    "docs/safety-model.md keeps every existing sentence and adds the logs widening (from FEAT-003), add-ons and CI trust sections and the new known limits",
+    "Names agree across all files: sample-frontend, sample-backend, dfi-sample, dfi-frontend, dfi-backend, AWS_DEPLOY_ROLE_ARN, INSTALL_ADDONS, the _shared state key, chart versions 3.6.2 and 3.14.0; no em dashes or exclamation points in new prose; config/components.yaml still ships components: []"
+  ],
+  "verification": [
+    "bash -n c:/Devops/Repository/Developer-friendly-infra/scripts/verify-local.sh",
+    "bash c:/Devops/Repository/Developer-friendly-infra/scripts/verify-local.sh   (read-only by design; if the shell is down mark UNVERIFIED)",
+    "cd c:/Devops/Repository/Developer-friendly-infra/backend && python -m pytest -q",
+    "cd c:/Devops/Repository/Developer-friendly-infra/frontend && npm test",
+    "python script (or manual reads with read_file) that checks every relative markdown link target in README.md, RUNBOOK.md, VERSIONS.md, docs/end-to-end.md, terraform-shared/README.md, gitops/README.md and sample-app/README.md exists"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

@@ -1,0 +1,7 @@
+{
+  "task_id": "task-phase3-idp",
+  "task_description": "Extend c:\\Devops\\Repository\\Developer-friendly-infra so a developer can build a frontend and backend image, push to ECR from GitHub Actions via OIDC, have ArgoCD deploy Helm charts to EKS, reach the app, and watch pods, containers, logs and Helm/ArgoCD state in the portal. Offline, nothing is run against AWS. Full plan: c:\\Devops\\Repository\\devops-microservices-platform\\.agents\\tasks\\phase3-idp\\plan.md (items 1 to 19).",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-005", "FEAT-006"],
+  "blocked_reason": null
+}

@@ -1,0 +1,31 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "Backend read-only visibility: bounded redacted logs (run_kubectl_logs in services/kube.py only, services/redact.py, GET /api/logs), containers (services/containers.py, GET /api/containers), ArgoCD and Helm detail (services/argocd_detail.py, argocd_client.get_app_detail, GET /api/argocd/apps/{name}). Covers plan.md items 7 to 10. Independent of FEAT-001 and FEAT-002. FEAT-005 (frontend) depends on the response shapes defined here, so write the exact field names into this FEAT's findings. Strong safety rule: run_kubectl keeps refusing logs; test_guard.py invariants are changed only as listed.",
+  "status": "pending",
+  "steps": [
+    "Item 7: create backend\\app\\services\\redact.py; add run_kubectl_logs and constants to backend\\app\\services\\kube.py (exact argv: kubectl --context <c> --request-timeout=<n>s logs <pod> -n <ns> -c <container> --tail=<1..500> --limit-bytes=262144 [--previous]); keep run_kubectl and _check_args untouched; create tests\\test_redact.py and tests\\test_kube_logs.py; add a logs-still-refused test to tests\\test_kube.py; add logs-only-in-kube.py and run_kubectl_logs-exists tests to tests\\test_guard.py. Build secret-looking test inputs from fragments at runtime.",
+    "Item 8: create backend\\app\\routers\\logs.py and a container_param in routers\\deps.py; wire logs into backend\\app\\main.py; update the exact router-tuple line in tests\\test_guard.py::test_main_mounts_exactly_the_expected_routers; create tests\\test_logs_api.py; add the 'Bounded logs' section to docs\\safety-model.md (grammar, reason, risk: sensitive data, best-effort redaction, localhost only, limits, --limit-bytes); update backend\\README.md.",
+    "Item 9: create backend\\app\\services\\containers.py, backend\\app\\routers\\containers.py, fixtures under backend\\tests\\fixtures\\phase3\\ (pod_multi_container.json, pod_minimal.json, README.md), tests\\test_containers.py; wire containers in main.py and the test_guard.py router line; update backend\\README.md.",
+    "Item 10: create backend\\app\\services\\argocd_detail.py (pure), add get_app_detail to backend\\app\\services\\argocd_client.py (reuse _call, no new client.get or client.post, no words kubectl or subprocess), add GET /argocd/apps/{name} to backend\\app\\routers\\argocd.py with a Path pattern and argocd_transport dependency; fixtures argocd_app_helm.json and argocd_app_directory.json; tests\\test_argocd_detail.py; add the 'detail module imports no httpx or subprocess' test to test_guard.py; update backend\\README.md. Do not return inline Helm values; mask secret-looking parameter values.",
+    "Final step: run the whole backend suite, write the exact JSON field names of /api/logs, /api/containers and /api/argocd/apps/{name} into this FEAT's findings for the frontend coder, and append a '## FEAT-003' section to c:\\Devops\\Repository\\devops-microservices-platform\\.agents\\tasks\\phase3-idp\\verification.md."
+  ],
+  "acceptance_criteria": [
+    "run_kubectl still raises ReadOnlyViolation for the logs verb and READ_ONLY_VERBS is exactly {'get'}; the allow-list tests and test_only_kube_imports_subprocess are unchanged and still hold",
+    "run_kubectl_logs accepts only the documented shape: tail int 1..500 (bool, str, float rejected), previous bool, pod and container fullmatch RFC-1123 regexes, argv list with shell off, timeouts, output capped at 262144 bytes, redaction applied inside the function",
+    "GET /api/logs, GET /api/containers and GET /api/argocd/apps/{name} exist, are GET only, return the shapes in plan.md, and have tests for success, validation errors (422), unknown cluster (404), kubectl or ArgoCD failure states",
+    "Redaction covers Bearer tokens, password/token/secret/api_key style pairs, AWS access key ids and secret-looking 40-char strings, JWTs, URL credentials and PEM private keys, leaves a 40-hex Git SHA unchanged, and is idempotent",
+    "argocd_client.py still has exactly one client.get( and one client.post(, exactly the two write functions, and does not contain the words kubectl or subprocess; argocd_detail.py imports neither httpx nor subprocess; inline Helm values are never returned",
+    "docs\\safety-model.md describes the logs widening, its reason and its risk without removing any existing text",
+    "cd backend && python -m pytest -q passes (or is recorded UNVERIFIED with the command)"
+  ],
+  "verification": [
+    "cd c:/Devops/Repository/Developer-friendly-infra/backend && python -m pytest tests/test_redact.py tests/test_kube_logs.py tests/test_kube.py tests/test_guard.py -q",
+    "cd c:/Devops/Repository/Developer-friendly-infra/backend && python -m pytest tests/test_logs_api.py tests/test_containers.py tests/test_argocd_detail.py tests/test_argocd_client.py tests/test_argocd.py -q",
+    "cd c:/Devops/Repository/Developer-friendly-infra/backend && python -m pytest -q",
+    "python -m compileall -q c:/Devops/Repository/Developer-friendly-infra/backend/app",
+    "If the shell is down: mark every command UNVERIFIED and re-read each new file once against the test_guard.py forbidden-string rules (write-verb string constants, '--force', 'rollout restart', 'kubectl apply')"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

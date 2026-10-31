@@ -1,0 +1,27 @@
+{
+  "id": "FEAT-005",
+  "type": "feat",
+  "description": "Portal frontend: pod detail panel (containers table, log viewer with container select, tail 50/100/200/500, previous toggle, Refresh, monospace output, redaction note, empty/error states) and expandable ArgoCD app rows with Helm/ArgoCD detail and the 'no helm list' help text. Covers plan.md items 15 and 16. Depends on FEAT-003: read its findings for the exact response field names before writing types.ts. Tests use renderToStaticMarkup (node environment, no effects), so each feature is a pure presentational component plus a thin useLoadable container.",
+  "status": "pending",
+  "steps": [
+    "Read FEAT-003.json findings first and copy the exact field names into types.ts (ContainerRow, ContainersResponse, LogsResponse, ArgoAppDetail, ArgoAppDetailResponse) and api.ts (containers, logs, argoAppDetail).",
+    "Item 15: create components\\ContainersTable.tsx (pure), LogsView.tsx (pure), PodDetail.tsx (container with useLoadable, container select, tail select 50/100/200/500, previous checkbox disabled when restart_count is 0, Refresh, Close); edit PodTable.tsx (Details button, keep Diagnose and its aria-label), ClusterDetail.tsx (detailPod state reset on cluster or namespace change), styles.css, tone.ts if needed; fixtures src\\test-fixtures\\containers.sample.json and logs.sample.json; tests ContainersTable.test.tsx and LogsView.test.tsx (including HTML escaping of a <script> log line and the always-present redaction note); extend fixtures-boundary.test.ts without changing existing tests.",
+    "Item 16: create components\\ArgoAppDetailView.tsx (pure: source, images, sync and health, last operation, history up to 10, out-of-sync resources, help text 'ArgoCD renders Helm charts itself, so there is no helm list here.'), ArgoAppRow.tsx (container, loads on expand, ErrorBanner and EmptyState for non-ok statuses); edit ArgoPanel.tsx (Details toggle per row, second <tr> with colSpan, existing branches unchanged); styles.css; fixture src\\test-fixtures\\argocd-detail.sample.json; test ArgoAppDetailView.test.tsx.",
+    "Respect strict TypeScript (noUncheckedIndexedAccess is on): index arrays with a fallback. No new npm packages. No fabricated rows: every empty state is explicit.",
+    "Append a '## FEAT-005' section to c:\\Devops\\Repository\\devops-microservices-platform\\.agents\\tasks\\phase3-idp\\verification.md."
+  ],
+  "acceptance_criteria": [
+    "types.ts and api.ts match the backend field names recorded in FEAT-003 findings",
+    "The pod detail panel shows a containers table (kind, image tag or digest, ready, restarts, state with reason and exit code, probes) and a logs section with container select, tail options 50/100/200/500, a previous toggle, a Refresh button, a monospace <pre>, the visible note 'Logs are redacted best-effort. Do not treat them as safe to share.', and explicit idle, loading, empty and error states",
+    "The ArgoCD panel has an expandable row per app that shows source (repo, chart or path, target revision), images, last operation, up to 10 history entries, out-of-sync resources, and the Helm help text; non-ok ArgoCD statuses show the backend message",
+    "No runtime file imports a test fixture; fixtures-boundary.test.ts covers the new fixture names",
+    "cd frontend && npm test && npm run build passes (or is recorded UNVERIFIED with the commands)"
+  ],
+  "verification": [
+    "cd c:/Devops/Repository/Developer-friendly-infra/frontend && npm install && npm test",
+    "cd c:/Devops/Repository/Developer-friendly-infra/frontend && npm run build   (runs tsc -b, the type check)",
+    "If npm cannot run: mark UNVERIFIED and re-read each new .tsx for strict-mode issues (possibly undefined array access, unused imports, missing keys)"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

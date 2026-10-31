@@ -1,0 +1,32 @@
+{
+  "id": "FEAT-004",
+  "type": "feat",
+  "description": "Sample app, generic Helm chart, GitOps apps and CI: sample-app/backend (FastAPI, Dockerfile, tests), sample-app/frontend (static page, nginx-unprivileged, start script writing /tmp/config/config.json), sample-app/charts/web-service (one chart for both apps, Ingress off by default), gitops/values and gitops/apps (manual sync), commented catalog entries in config/components.yaml, .github/workflows/build-push.yml (OIDC, Trivy before push, SHA tags only, bump job), sample-app/README.md and gitops/README.md. Covers plan.md items 11 to 14. Independent of FEAT-003. Uses names from FEAT-001 (AWS_DEPLOY_ROLE_ARN, repos dfi-frontend and dfi-backend) and plan.md decisions D11 to D16.",
+  "status": "pending",
+  "steps": [
+    "Item 11: create sample-app\\backend\\ (sample_api\\main.py with /healthz /readyz /api/hello /api/version reading env per request, requirements.txt, requirements-dev.txt, tests\\test_main.py, multi-stage non-root Dockerfile on python:3.13.18-slim-bookworm, .dockerignore). Confirm pins on PyPI or write CHECK-LATEST-FROM placeholders.",
+    "Item 12: create sample-app\\frontend\\ (public\\index.html, app.js with textContent only, style.css; nginx\\default.conf; docker-entrypoint.d\\40-write-config.sh with validated env and no eval; multi-stage Dockerfile with an nginx -t check stage and USER of the image's built-in non-root user; .dockerignore; README.md). nginx tag is a placeholder unless a real tag is read from Docker Hub.",
+    "Item 13: create sample-app\\charts\\web-service\\ (Chart.yaml, .helmignore, values.yaml, templates _helpers.tpl, deployment, service, configmap, serviceaccount, ingress (enabled false, ingressClassName alb), hpa (off), NOTES.txt). Non-root, readOnlyRootFilesystem, writableDirs emptyDir, probes, resources, envFrom secretRef by name only, required image.repository and image.tag.",
+    "Item 14: create gitops\\values\\frontend.yaml and backend.yaml (image.repository 589389425618.dkr.ecr.us-east-1.amazonaws.com/dfi-<app>, one-line '  tag: \"REPLACE-AFTER-FIRST-CI-RUN\"', ingress disabled with ALB annotations and a shared group name), gitops\\apps\\frontend.yaml and backend.yaml (repoURL REPLACE-WITH-YOUR-GIT-REPO-URL, path sample-app/charts/web-service, valueFiles ../../../gitops/values/<app>.yaml, namespace dfi-sample, CreateNamespace=true, NO automated block), gitops\\README.md, commented sample entries in config\\components.yaml (components: [] stays the only live line), .github\\workflows\\build-push.yml (detect, build matrix, bump jobs; actions pinned to full commit SHAs or CHECK-LATEST-FROM placeholders), sample-app\\README.md.",
+    "Append a '## FEAT-004' section to c:\\Devops\\Repository\\devops-microservices-platform\\.agents\\tasks\\phase3-idp\\verification.md with every placeholder still in the files (nginx tag, action SHAs, PyPI pins, tag REPLACE-AFTER-FIRST-CI-RUN)."
+  ],
+  "acceptance_criteria": [
+    "The chart renders no Ingress by default; image.repository and image.tag are required; no Secret object exists in the chart; container runs non-root with readOnlyRootFilesystem and drops all capabilities",
+    "Both gitops apps have no syncPolicy.automated block, use valueFiles ../../../gitops/values/<app>.yaml relative to sample-app/charts/web-service, and the values files hold ingress.enabled false and an image.tag line that matches the CI sed anchor '^  tag: '",
+    "The workflow uses OIDC only (role-to-assume from secrets.AWS_DEPLOY_ROLE_ARN), no static AWS keys, never tags latest, scans with Trivy (CRITICAL,HIGH, exit-code 1) before docker push, grants contents: write only to the bump job and id-token: write only to the build job, never calls ArgoCD, and passes untrusted values through env not into run text",
+    "config/components.yaml still parses to components: [] and the commented entries explain how to enable them",
+    "Sample backend tests pass with pytest; helm lint and helm template succeed with the default and both gitops values files (or are recorded UNVERIFIED with the commands)",
+    "No invented version, digest or SHA: every unconfirmed value is the literal text CHECK-LATEST-FROM-<url>"
+  ],
+  "verification": [
+    "cd c:/Devops/Repository/Developer-friendly-infra/sample-app/backend && python -m pytest -q",
+    "bash -n c:/Devops/Repository/Developer-friendly-infra/sample-app/frontend/docker-entrypoint.d/40-write-config.sh",
+    "helm lint c:/Devops/Repository/Developer-friendly-infra/sample-app/charts/web-service --set image.repository=x --set image.tag=y   (if helm exists)",
+    "helm template t c:/Devops/Repository/Developer-friendly-infra/sample-app/charts/web-service -f c:/Devops/Repository/Developer-friendly-infra/gitops/values/frontend.yaml   (and backend.yaml; also with --set ingress.enabled=true --set autoscaling.enabled=true)",
+    "python -c \"import yaml,sys; [list(yaml.safe_load_all(open(f, encoding='utf-8'))) for f in sys.argv[1:]]\" c:/Devops/Repository/Developer-friendly-infra/gitops/values/frontend.yaml c:/Devops/Repository/Developer-friendly-infra/gitops/values/backend.yaml c:/Devops/Repository/Developer-friendly-infra/gitops/apps/frontend.yaml c:/Devops/Repository/Developer-friendly-infra/gitops/apps/backend.yaml c:/Devops/Repository/Developer-friendly-infra/.github/workflows/build-push.yml c:/Devops/Repository/Developer-friendly-infra/config/components.yaml",
+    "cd c:/Devops/Repository/Developer-friendly-infra/backend && python -m pytest tests/test_deploy_catalog.py -q   (the shipped catalog must still parse and stay empty)",
+    "If the shell or helm is missing: mark UNVERIFIED with these commands and re-read every template for indentation, trim marks and quoting"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
