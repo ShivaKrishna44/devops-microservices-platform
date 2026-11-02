@@ -484,3 +484,138 @@ arrows are the ECR calls here. In the current Jenkinsfile the "Deploy to EKS" st
 runs `kubectl` directly. The GitOps design moves deployment to ArgoCD, so in the GitOps version Jenkins
 only needs ECR access, and ArgoCD (inside the cluster) does the deploy, so Jenkins no longer needs EKS
 access at all.
+
+## The same flow with GitHub Actions instead of Jenkins
+
+GitHub Actions replaces the Jenkins CI job and the Jenkins CD job. Everything after the handover to
+Git is the same: ArgoCD deploys, Prometheus and Grafana watch. The two real differences are:
+
+1. **No agent to run or patch.** GitHub-hosted runners are temporary VMs that GitHub provides. There
+   is no EC2 agent to connect, no controller to keep online.
+2. **No stored AWS keys.** The runner authenticates to AWS with OIDC: it gets a short-lived token and
+   assumes an IAM role. Nothing long-lived is saved.
+
+### The picture
+
+```
+                       Developer: git push (to GitHub)
+                                   |
+                                   v
+  +----------------------------------------------------------------------+
+  | GitHub Actions - CI job (on a GitHub-hosted runner, temporary VM)    |
+  |                                                                      |
+  |   checkout -> dependency scan (OWASP) -> SonarQube quality gate      |
+  |            -> docker build -> Trivy image scan                       |
+  |                                                                      |
+  |   AWS auth: OIDC (no keys). The runner asks AWS STS to assume an     |
+  |   IAM role, gets temporary creds, then pushes to ECR.                |
+  +----------------------------------------------------------------------+
+        |                                   |
+        | (1) OIDC token                    | (2) push image
+        v                                   v
+  +--------------------+            +---------------------------+
+  | AWS IAM + STS      |            | Amazon ECR                |
+  | trust: this repo,  |            | login via the assumed role|
+  | this branch -> role|            | docker push               |
+  +--------------------+            +---------------------------+
+                                                |
+                                                v  (CD job, same workflow or a second one)
+  +----------------------------------------------------------------------+
+  | GitHub Actions - CD job                                              |
+  |   edits charts/microservice/values-<svc>.yaml with the new tag       |
+  |   commits + pushes back to Git (using GITHUB_TOKEN)                   |
+  +----------------------------------------------------------------------+
+                                   |
+                                   v
+                 GitHub repo (new image tag committed)
+                                   |
+                                   v
+                 Argo CD (pull) -> Kubernetes (EKS) -> running pods
+                                   |
+                                   v
+                 Prometheus -> Grafana -> email / Slack alert
+```
+
+### Where it lives and the settings
+
+| Thing | Jenkins | GitHub Actions |
+|-------|---------|----------------|
+| Pipeline file | `Jenkinsfile` at repo root | `.github/workflows/<name>.yml` in the repo |
+| Where it runs | Your EC2 agent (label `AGENT`) | GitHub-hosted runner (or a self-hosted one) |
+| AWS auth | Agent IAM role or stored keys | OIDC: assume an IAM role, no keys |
+| Secrets | Jenkins Credentials store | Repo or org Settings -> Secrets and variables -> Actions |
+| Trigger | Build with Parameters, or SCM poll | `on: push` / `pull_request` / `workflow_dispatch` |
+| Git write-back | Git PAT credential | built-in `GITHUB_TOKEN` |
+
+### One-time setup for OIDC (this is the key part)
+
+Done once in AWS and once in the repo. No access keys are ever stored.
+
+1. **AWS: add GitHub as an OIDC identity provider.**
+   Provider URL `https://token.actions.githubusercontent.com`, audience `sts.amazonaws.com`.
+
+2. **AWS: create an IAM role the workflow can assume.**
+   The trust policy must pin the exact repo and branch, or any repo could assume it:
+
+   ```json
+   "Condition": {
+     "StringEquals": { "token.actions.githubusercontent.com:aud": "sts.amazonaws.com" },
+     "StringLike":   { "token.actions.githubusercontent.com:sub": "repo:ShivaKrishna44/devops-microservices-platform:ref:refs/heads/main" }
+   }
+   ```
+
+   Give the role the same ECR permissions the Jenkins agent needed (get token, describe/create repo,
+   push). For a GitOps setup it does not need EKS access, because ArgoCD deploys.
+
+3. **GitHub: store the role ARN** as a repo secret, for example `AWS_DEPLOY_ROLE_ARN`
+   (Settings -> Secrets and variables -> Actions). The role ARN is not secret, but a secret keeps it
+   out of the YAML.
+
+4. **Workflow: ask for an OIDC token and assume the role.**
+
+   ```yaml
+   permissions:
+     id-token: write      # lets the runner request the OIDC token
+     contents: write      # lets the CD job commit the tag back to Git
+   jobs:
+     build:
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v4
+         - uses: aws-actions/configure-aws-credentials@v4
+           with:
+             role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+             aws-region: us-east-1
+         - name: Login to ECR
+           run: aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 589389425618.dkr.ecr.us-east-1.amazonaws.com
+         # build, Trivy scan, push, then update the tag in Git
+   ```
+
+### How the runner interacts with AWS (versus the Jenkins agent)
+
+```
+  Jenkins agent:  stored IAM role/keys on EC2  -> AWS CLI -> ECR (and EKS, in the direct-deploy version)
+  GitHub runner:  OIDC token -> STS AssumeRole -> temporary creds -> AWS CLI -> ECR
+```
+
+The runner proves its identity with a signed OIDC token that says which repo and branch it is. AWS
+checks that against the role's trust policy and hands back short-lived credentials. When the job ends,
+the credentials are gone. This is why the common failure is the trust policy: if the `sub` condition
+does not match your repo and branch, STS returns `Not authorized to perform sts:AssumeRoleWithWebIdentity`.
+
+### What stays exactly the same
+
+- The three gates: OWASP, SonarQube, Trivy.
+- The handover: CI ends by committing the image tag to Git.
+- ArgoCD pulls from Git and deploys to EKS. No change.
+- Route 53, ALB, Ingress, Services and pods. No change.
+- Prometheus, Grafana and alerts. No change.
+
+### When to pick which
+
+- **GitHub Actions:** new projects, no server to run, keyless AWS with OIDC, code and CI in one place.
+- **Jenkins:** you already run Jenkins, need specific plugins, self-hosted build agents, or builds that
+  must run inside your own network.
+
+For this project either works. The cleanest modern setup is GitHub Actions with OIDC for CI, then
+ArgoCD for CD.
